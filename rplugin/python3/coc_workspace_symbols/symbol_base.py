@@ -68,8 +68,6 @@ class SymbolBase(Base):
         if query != self.prev_query:
             info("prepare for next lookup for query '%s'" % query)
             # Search for new query
-            self.vim.call(
-                'denite_coc_workspace_symbols#prepare_for_next_query')
             self.start_lookup(query)
             self.prev_query = query
             return []

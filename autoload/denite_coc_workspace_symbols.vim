@@ -1,18 +1,14 @@
-let s:last_req_id = 0
+let s:results = []
 
-function! s:handle_symbols(req_id, error, response) abort
-  if a:req_id != s:last_req_id
-    return
-  endif
-
+function! s:handle_symbols(error, response) abort
   if a:error != v:null
     let l:results = []
   else
     let l:results = a:response
   endif
 
-  let s:results = l:results
-  let s:request_completed = v:true
+  " add received results to the global results
+  call extend(s:results, l:results)
 endfunction
 
 function! denite_coc_workspace_symbols#set_current_server() abort
@@ -21,19 +17,12 @@ function! denite_coc_workspace_symbols#set_current_server() abort
   let s:servers = filter(s:servers, 'index(v:val.languageIds, &filetype) >= 0')
 endfunction
 
-function! denite_coc_workspace_symbols#prepare_for_next_query() abort
-  let s:request_completed = v:false
-  let s:results = []
-  let s:last_req_id = (s:last_req_id + 1) % 100000
-endfunction
-
-function! denite_coc_workspace_symbols#request_completed() abort
-  return s:request_completed
-endfunction
-
 function! denite_coc_workspace_symbols#try_get_results() abort
-  if s:request_completed
-    return s:results
+  if !empty(s:results)
+    let l:results = s:results
+    " clear the results
+    let s:results = []
+    return l:results
   else
     return v:null
   endif
@@ -45,7 +34,16 @@ function! denite_coc_workspace_symbols#workspace_symbols(query) abort
           \   l:server.id,
           \   'workspace/symbol',
           \   { 'query': a:query },
-          \   funcref('s:handle_symbols', [s:last_req_id]),
+          \   funcref('s:handle_symbols'),
+          \ )
+
+    " It seems that some language servers (e.g. rust-analyzer) need a query to
+    " be starting with '#', so populate results with that query.
+    call CocRequestAsync(
+          \   l:server.id,
+          \   'workspace/symbol',
+          \   { 'query': '#' . a:query },
+          \   funcref('s:handle_symbols'),
           \ )
   endfor
 endfunction
